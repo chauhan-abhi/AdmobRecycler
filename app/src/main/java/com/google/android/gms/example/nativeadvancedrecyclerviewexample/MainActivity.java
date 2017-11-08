@@ -22,6 +22,15 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 
+import com.google.android.gms.ads.AdListener;
+import com.google.android.gms.ads.AdLoader;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.formats.NativeAd;
+import com.google.android.gms.ads.formats.NativeAppInstallAd;
+import com.google.android.gms.ads.formats.NativeContentAd;
+import com.google.android.gms.ads.reward.RewardedVideoAd;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -42,10 +51,22 @@ public class MainActivity extends AppCompatActivity {
     // List of MenuItems that populate the RecyclerView.
     private List<Object> mRecyclerViewItems = new ArrayList<>();
 
+    private RewardedVideoAd mAd;
+
+    // The number of native ads to load and display.
+    public static final int NUMBER_OF_ADS = 5;
+
+    // List of native ads that have been successfully loaded.
+    private List<NativeAd> mNativeAds = new ArrayList<>();
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Initialize the Mobile Ads SDK.
+        MobileAds.initialize(this, getString(R.string.admob_app_id));
 
         if (savedInstanceState == null) {
             // Create new fragment to display a progress spinner while the data set for the
@@ -60,13 +81,74 @@ public class MainActivity extends AppCompatActivity {
             // Update the RecyclerView item's list with menu items.
             addMenuItemsFromJson();
 
-            loadMenu();
+            //loadMenu();           Instead, invoke loadMenu() after insertAdsInMenuItems() in loadNativeAd()
+            loadNativeAd();
         }
     }
 
     public List<Object> getRecyclerViewItems() {
         return mRecyclerViewItems;
     }
+
+    private void insertAdsInMenuItems() {
+        if (mNativeAds.size() <= 0) {
+            return;
+        }
+
+        int offset = (mRecyclerViewItems.size() / mNativeAds.size()) + 1;
+        int index = 0;
+        for (NativeAd ad: mNativeAds) {
+            mRecyclerViewItems.add(index, ad);
+            index = index + offset;
+        }
+        //loadMenu();
+    }
+
+    private void loadNativeAd() {
+        loadNativeAd(0);
+    }
+
+    private void loadNativeAd(final int adLoadCount) {
+
+        if (adLoadCount >= NUMBER_OF_ADS) {
+            insertAdsInMenuItems();
+            loadMenu();
+            return;
+        }
+
+        AdLoader.Builder builder = new AdLoader.Builder(this, getString(R.string.ad_unit_id));
+        AdLoader adLoader = builder.forAppInstallAd(new NativeAppInstallAd.OnAppInstallAdLoadedListener() {
+            @Override
+            public void onAppInstallAdLoaded(NativeAppInstallAd ad) {
+                // An app install ad loaded successfully, call this method again to
+                // load the next ad in the items list.
+                mNativeAds.add(ad);
+                loadNativeAd(adLoadCount + 1);
+
+            }
+        }).forContentAd(new NativeContentAd.OnContentAdLoadedListener() {
+            @Override
+            public void onContentAdLoaded(NativeContentAd ad) {
+                // A content ad loaded successfully, call this method again to
+                // load the next ad in the items list.
+                mNativeAds.add(ad);
+                loadNativeAd(adLoadCount + 1);
+            }
+        }).withAdListener(new AdListener() {
+            @Override
+            public void onAdFailedToLoad(int errorCode) {
+                // A native ad failed to load. Call this method again to load
+                // the next ad in the items list.
+                Log.e("MainActivity", "The previous native ad failed to load. Attempting to" +
+                        " load another.");
+                loadNativeAd(adLoadCount + 1);
+            }
+        }).build();
+
+        // Load the Native Express ad.
+        adLoader.loadAd(new AdRequest.Builder().build());
+    }
+
 
     private void loadMenu() {
         // Create new fragment and transaction
@@ -137,4 +219,12 @@ public class MainActivity extends AppCompatActivity {
         return new String(builder);
     }
 
+
+
+
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+    }
 }
