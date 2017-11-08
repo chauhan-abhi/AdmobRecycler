@@ -66,4 +66,5 @@ public class RecyclerViewFragment extends Fragment {
 
         return rootView;
     }
+
 }
